@@ -1,0 +1,8 @@
+# Line endings: the repository stores everything as LF (the Linux/CI standard).
+# Git converts automatically, so a file does not show up as "changed" just because
+# it was saved on Windows (CRLF) and read on Linux (LF).
+* text=auto eol=lf
+
+# Windows Command Prompt scripts need CRLF to run correctly.
+*.bat text eol=crlf
+*.cmd text eol=crlf

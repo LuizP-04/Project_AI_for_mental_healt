@@ -1,3 +1,84 @@
+# =====================================================================
+# Project: sensitive data and artifacts that must NEVER be committed
+# (LGPD: health data is sensitive personal data). Add exceptions on purpose, one by one.
+# =====================================================================
+
+# Data, weights and results folders at the repository root.
+# The leading slash keeps a "models/" subpackage inside src/ from being ignored by mistake.
+/data/
+/models/
+/outputs/
+
+# Secrets and environment variables (only the empty template .env.example may be committed)
+*.env
+.env*
+!.env.example
+
+# Tabular and serialized data
+*.csv
+*.tsv
+*.jsonl
+*.parquet
+*.arrow
+*.feather
+*.pkl
+*.pickle
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.xlsx
+*.xls
+
+# Local databases (e.g., patient history for RF13)
+*.db
+*.sqlite
+*.sqlite3
+
+# Model weights
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.gguf
+*.onnx
+
+# Images and documents (handwritten manuscripts)
+*.jpg
+*.jpeg
+*.png
+*.tif
+*.tiff
+*.bmp
+*.webp
+*.pdf
+
+# Audio and video (DAIC-WOZ, for example, includes interview recordings)
+*.wav
+*.mp3
+*.flac
+*.m4a
+*.mp4
+*.avi
+
+# Archives (datasets often ship this way)
+*.zip
+*.tar
+*.gz
+*.7z
+*.rar
+
+# Notebooks store cell outputs, which may contain dataset text
+*.ipynb
+
+# Personal (local) Claude Code settings
+.claude/settings.local.json
+
+# =====================================================================
+# Standard GitHub Python template (unchanged from here down)
+# =====================================================================
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
