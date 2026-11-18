@@ -1,0 +1,29 @@
+# Checks that run automatically before every commit.
+# Turn them on once per clone with: uv run python -m pre_commit install
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.5 # keep in sync with the ruff version in uv.lock
+    hooks:
+      - id: ruff-check
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+        exclude: ^uv\.lock$ # the lock file grows with the dependencies
+      - id: detect-private-key
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+
+  - repo: local
+    hooks:
+      - id: check-no-data
+        name: block data files (LGPD)
+        entry: python scripts/check_no_data.py
+        language: python

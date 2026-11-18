@@ -1,0 +1,29 @@
+# Continuous integration: lint, data guard and tests on every pull request and
+# on every push to main. It runs on GitHub's servers with code and made-up test
+# data only: no datasets, no models, no GPU.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+      - name: Install the locked environment
+        run: uv sync --locked
+      - name: Lint
+        run: uv run ruff check .
+      - name: Check formatting
+        run: uv run ruff format --check .
+      - name: Block data files
+        run: uv run python scripts/check_no_data.py --all
+      - name: Tests (network blocked)
+        run: uv run pytest
