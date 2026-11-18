@@ -22,6 +22,7 @@ from moodai.offline import is_offline
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MIN_PYTHON = (3, 11)
 MIN_FREE_DISK_GB = 30
+FP16_TEST_SIZE = 2048  # side of the square matrix used in the GPU test (8 MiB in FP16)
 # Folder names used by common cloud sync clients.
 CLOUD_SYNC_MARKERS = ("onedrive", "dropbox", "google drive", "googledrive", "icloud")
 
@@ -93,11 +94,11 @@ def check_data_paths_ignored(paths: object) -> str:
     return report(OK, f"Ignored by git: {', '.join(str(folder) for folder in paths.values())}")
 
 
-def check_gpu() -> str:
-    """Report the NVIDIA GPU and its memory through nvidia-smi."""
+def query_gpu() -> tuple[str, int, int, str] | None:
+    """Return name, total MiB, used MiB and driver of the first NVIDIA GPU, or None."""
     nvidia_smi = shutil.which("nvidia-smi")
     if nvidia_smi is None:
-        return report(WARN, "nvidia-smi not found; no NVIDIA GPU or driver detected.")
+        return None
     query = "--query-gpu=name,memory.total,memory.used,driver_version"
     try:
         result = subprocess.run(
@@ -107,11 +108,42 @@ def check_gpu() -> str:
             timeout=20,
             check=False,
         )
-        name, total, used, driver = (field.strip() for field in result.stdout.split(","))
-        total_mib, used_mib = int(total), int(used)
-    except (subprocess.TimeoutExpired, ValueError):
-        return report(WARN, "Could not read the GPU through nvidia-smi.")
-    return report(OK, f"GPU {name}: {total_mib} MiB total, {used_mib} MiB in use, driver {driver}")
+        first_gpu = result.stdout.strip().splitlines()[0]
+        name, total, used, driver = (field.strip() for field in first_gpu.split(","))
+        return name, int(total), int(used), driver
+    except (subprocess.TimeoutExpired, ValueError, IndexError):
+        return None
+
+
+def check_gpu() -> str:
+    """Report the NVIDIA GPU and its memory through nvidia-smi."""
+    gpu = query_gpu()
+    if gpu is None:
+        return report(WARN, "No NVIDIA GPU found (nvidia-smi is missing or failed).")
+    name, total, used, driver = gpu
+    return report(OK, f"GPU {name}: {total} MiB total, {used} MiB in use, driver {driver}")
+
+
+def check_torch() -> str:
+    """Check that PyTorch can use the GPU: run an FP16 matrix product and measure its VRAM."""
+    try:
+        import torch
+    except ImportError:
+        return report(WARN, "PyTorch is not installed.")
+    if not torch.cuda.is_available():
+        return report(WARN, f"PyTorch {torch.__version__} cannot use the GPU (CUDA unavailable).")
+    before = query_gpu()
+    matrix = torch.randn(FP16_TEST_SIZE, FP16_TEST_SIZE, device="cuda", dtype=torch.float16)
+    product = matrix @ matrix
+    torch.cuda.synchronize()
+    after = query_gpu()
+    if not torch.isfinite(product).all():
+        return report(FAIL, "The FP16 test on the GPU returned invalid numbers.")
+    message = f"PyTorch {torch.__version__} (CUDA {torch.version.cuda}) runs FP16 on the GPU"
+    if before and after:
+        # Includes the CUDA context, a fixed cost that every model on the GPU also pays.
+        message += f"; this test used about {after[2] - before[2]} MiB of VRAM"
+    return report(OK, message)
 
 
 def check_disk() -> str:
@@ -158,7 +190,7 @@ def main() -> int:
         results.append(report(FAIL, str(error)))
     else:
         results.append(check_data_paths_ignored(config.get("paths")))
-    results += [check_gpu(), check_disk(), check_long_paths()]
+    results += [check_gpu(), check_torch(), check_disk(), check_long_paths()]
 
     failures, warnings = results.count(FAIL), results.count(WARN)
     print(f"\n{failures} failure(s), {warnings} warning(s).")

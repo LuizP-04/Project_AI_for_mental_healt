@@ -11,7 +11,9 @@ license-files = ["LICENSE"]
 authors = [{ name = "Luiz Passarinho" }]
 requires-python = ">=3.11"
 dependencies = [
+    "numpy>=2.4.6",
     "pyyaml>=6.0.3",
+    "torch>=2.15.0",
 ]
 
 [build-system]
@@ -51,3 +53,22 @@ dev = [
     "pytest-socket>=0.8.1",
     "ruff>=0.17.5",
 ]
+
+# PyTorch comes from the official PyTorch indexes, not from PyPI: on Windows the
+# CUDA 13.2 build (it uses the RTX 3050), on Linux the CPU-only build (the CI has
+# no GPU, so it downloads 200 MB instead of 2 GB).
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu132", marker = "sys_platform == 'win32'" },
+    { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
+explicit = true # only for the packages listed in [tool.uv.sources]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

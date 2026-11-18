@@ -8,7 +8,7 @@ The prototype runs **100% locally**, in Python. It analyzes **typed text** and *
 
 ## Status
 
-Work in progress. The repository skeleton, the Python environment and the privacy guards are ready. The input pipeline (OpenCV preprocessing, OCR and anonymization) comes next; there is no analysis code yet.
+Work in progress. The repository skeleton, the Python environment (including PyTorch with CUDA) and the privacy guards are ready. The input pipeline (OpenCV preprocessing, OCR and anonymization) comes next; there is no analysis code yet.
 
 ## How it works
 
@@ -61,6 +61,8 @@ uv run python -m pre_commit install  # turns on the checks that run before every
 ```
 
 Keep the clone in a local folder that is not synced with the cloud (see Privacy). pre-commit is called through Python (`python -m pre_commit`) because Windows Smart App Control can block its unsigned `pre-commit.exe` launcher.
+
+On Windows, `uv sync` installs PyTorch with CUDA 13.2 (a download of about 2 GB), so the models can run on the GPU; no separate CUDA Toolkit is needed. On Linux it installs the CPU-only build (about 200 MB), which is what the CI uses. The project is sized for an NVIDIA GPU with 6 GB of VRAM.
 
 ## Usage
 
