@@ -8,7 +8,7 @@ The prototype runs **100% locally**, in Python. It analyzes **typed text** and *
 
 ## Status
 
-Work in progress. Current stage: **environment and input pipeline**. There is no runnable code yet.
+Work in progress. The repository skeleton, the Python environment and the privacy guards are ready. The input pipeline (OpenCV preprocessing, OCR and anonymization) comes next; there is no analysis code yet.
 
 ## How it works
 
@@ -49,9 +49,37 @@ Folders are created as the project progresses.
 └── outputs/       # not in git: experiment results
 ```
 
-## Installation and usage
+## Installation
 
-Coming soon.
+You need [uv](https://docs.astral.sh/uv/), which also installs the right Python version (3.12) for the project. On Windows: `winget install --id astral-sh.uv -e`.
+
+```
+git clone https://github.com/LuizP-04/Project_AI_for_mental_healt.git
+cd Project_AI_for_mental_healt
+uv sync                              # creates .venv with the exact versions in uv.lock
+uv run python -m pre_commit install  # turns on the checks that run before every commit
+```
+
+Keep the clone in a local folder that is not synced with the cloud (see Privacy). pre-commit is called through Python (`python -m pre_commit`) because Windows Smart App Control can block its unsigned `pre-commit.exe` launcher.
+
+## Usage
+
+| Command | What it does |
+|---|---|
+| `uv run python scripts/check_env.py` | Checks that this machine is ready and safe for the project |
+| `uv run pytest` | Runs the tests, with network access blocked |
+| `uv run ruff check .` | Lints the code |
+| `uv run ruff format .` | Formats the code |
+| `uv run python scripts/check_no_data.py --all` | Confirms that git tracks no data file |
+| `uv run python -m pre_commit run --all-files` | Runs every pre-commit check on the whole repository |
+
+## Keeping data out of git
+
+Three layers stop data files from reaching the repository:
+
+1. `.gitignore` ignores the data folders (`data/`, `models/`, `outputs/`) and data, weight, image, audio and archive file types.
+2. A pre-commit hook runs `scripts/check_no_data.py` before every commit. It also catches files forced in with `git add -f` and files larger than 1 MB.
+3. The CI runs the same check on every pull request and on every push to `main`, together with the linter and the tests.
 
 ## License
 
