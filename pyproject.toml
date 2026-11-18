@@ -39,7 +39,15 @@ mypy-init-return = true # __init__ may omit "-> None"
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN"] # tests do not need type hints
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# pytest-socket: block every network connection except to this machine (RNF01).
+addopts = ["--allow-hosts=127.0.0.1,::1"]
+
 [dependency-groups]
 dev = [
+    "pre-commit>=4.7.0",
+    "pytest>=9.2.0",
+    "pytest-socket>=0.8.1",
     "ruff>=0.17.5",
 ]
