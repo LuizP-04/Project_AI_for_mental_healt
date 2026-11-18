@@ -1,0 +1,13 @@
+# Default configuration. Paths are relative to the repository root.
+# Each new module (OCR, classifiers, debate...) adds its own section here.
+
+seed: 42 # fixed random seed, for reproducible experiments (RNF04)
+
+languages: [pt, en] # Portuguese and English
+
+# Local folders for data and artifacts. All of them are ignored by git.
+paths:
+  raw_data: data/raw # original datasets
+  processed_data: data/processed # cleaned and split datasets
+  models: models # downloaded or fine-tuned model weights
+  outputs: outputs # experiment results

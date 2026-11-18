@@ -1,0 +1,45 @@
+# Project metadata and tool settings. uv reads this file to build the virtual
+# environment; the exact version of every package is locked in uv.lock.
+
+[project]
+name = "moodai"
+version = "0.1.0"
+description = "Local, privacy-first assistant that suggests mood disorder hypotheses for mental health professionals (academic prototype, not a diagnostic tool)."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Luiz Passarinho" }]
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml>=6.0.3",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.9,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors (style)
+    "W",   # pycodestyle warnings (whitespace)
+    "F",   # pyflakes (unused imports, undefined names)
+    "I",   # isort (import order)
+    "UP",  # pyupgrade (modern Python syntax)
+    "B",   # flake8-bugbear (likely bugs)
+    "SIM", # flake8-simplify (simpler code)
+    "ANN", # flake8-annotations (type hints)
+]
+
+[tool.ruff.lint.flake8-annotations]
+mypy-init-return = true # __init__ may omit "-> None"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"] # tests do not need type hints
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.5",
+]
