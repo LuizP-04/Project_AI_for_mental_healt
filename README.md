@@ -8,7 +8,7 @@ The prototype runs **100% locally**, in Python. It analyzes **typed text** and *
 
 ## Status
 
-Work in progress. The repository skeleton, the Python environment (including PyTorch with CUDA) and the privacy guards are ready. The input pipeline (OpenCV preprocessing, OCR and anonymization) comes next; there is no analysis code yet.
+Work in progress. The repository skeleton, the Python environment (including PyTorch with CUDA), the privacy guards and the local LLM server (Ollama) are ready. The debate between the LLMs and the judge comes next, followed by anonymization, the classifiers and the handwriting pipeline; there is no analysis code yet.
 
 ## How it works
 
@@ -64,11 +64,26 @@ Keep the clone in a local folder that is not synced with the cloud (see Privacy)
 
 On Windows, `uv sync` installs PyTorch with CUDA 13.2 (a download of about 2 GB), so the models can run on the GPU; no separate CUDA Toolkit is needed. On Linux it installs the CPU-only build (about 200 MB), which is what the CI uses. The project is sized for an NVIDIA GPU with 6 GB of VRAM.
 
+### Local LLMs (Ollama)
+
+The debate runs on two small LLMs served by [Ollama](https://ollama.com) on this machine. The project pins Ollama 0.40.16 and uses its standalone build, which runs only while you start it: no background service and no automatic updates, so the version cannot change in the middle of an experiment.
+
+1. Download `ollama-windows-amd64.zip` (about 1.5 GB) from the [v0.40.16 release](https://github.com/ollama/ollama/releases/tag/v0.40.16), check its SHA-256 against the release's `sha256sum.txt`, extract it to `%LOCALAPPDATA%\Programs\Ollama-0.40.16` and add that folder to your user `PATH`.
+2. Turn off Ollama's cloud features, which would send the text to Ollama's servers: create `%USERPROFILE%\.ollama\server.json` containing `{"disable_ollama_cloud": true}`. Also set the user environment variables `OLLAMA_NO_CLOUD=1` and `OLLAMA_NOHISTORY=1` (the second one stops `ollama run` from saving what you type).
+3. Start the server in a terminal of its own with `ollama serve` (keep it open; stop it with Ctrl+C), then download the models listed under `llm` in `configs/default.yaml`, once: `ollama pull qwen3.5:4b-q4_K_M` (3.3 GB) and `ollama pull gemma4:e2b-it-qat` (4.3 GB).
+4. Run `uv run python scripts/check_env.py` to confirm the setup.
+
+Never set `OLLAMA_DEBUG` or `OLLAMA_DEBUG_LOG_REQUESTS`: they write generated or submitted text to logs and temporary files. Never run `ollama signin`, and never use a model whose name ends in `:cloud` or `-cloud`. The code also refuses any Ollama address outside this machine and any cloud model, ignores proxy settings and does not follow redirects.
+
+On Windows, programs that were already open when the variables were saved, VS Code included, only see them after you sign out of Windows and back in.
+
 ## Usage
 
 | Command | What it does |
 |---|---|
 | `uv run python scripts/check_env.py` | Checks that this machine is ready and safe for the project |
+| `ollama serve` | Starts the local LLM server; keep its terminal open while you use the LLMs |
+| `uv run python scripts/bench_llm.py` | Measures the local LLMs on this GPU: load time, memory, tokens per second and the time of a full debate |
 | `uv run pytest` | Runs the tests, with network access blocked |
 | `uv run ruff check .` | Lints the code |
 | `uv run ruff format .` | Formats the code |
