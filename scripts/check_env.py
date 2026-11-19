@@ -9,6 +9,7 @@ hard requirement is broken; the script then exits with code 1.
 """
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -17,6 +18,7 @@ from pathlib import Path
 
 import moodai
 from moodai.config import ConfigError, load_config
+from moodai.llm.local import LocalLLMError, check_host, connect, require_models, server_version
 from moodai.offline import is_offline
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -25,6 +27,13 @@ MIN_FREE_DISK_GB = 30
 FP16_TEST_SIZE = 2048  # side of the square matrix used in the GPU test (8 MiB in FP16)
 # Folder names used by common cloud sync clients.
 CLOUD_SYNC_MARKERS = ("onedrive", "dropbox", "google drive", "googledrive", "icloud")
+
+OLLAMA_SERVER_JSON = Path.home() / ".ollama" / "server.json"
+# Ollama reads its boolean variables with Go's strconv.ParseBool.
+GO_TRUE = {"1", "t", "T", "TRUE", "true", "True"}
+GO_FALSE = {"", "0", "f", "F", "FALSE", "false", "False"}
+# Ollama settings that would write the analyzed text to logs or files.
+OLLAMA_LOGGING_VARIABLES = ("OLLAMA_DEBUG", "OLLAMA_DEBUG_LOG_REQUESTS")
 
 OK, WARN, FAIL = "OK", "WARN", "FAIL"
 
@@ -146,6 +155,80 @@ def check_torch() -> str:
     return report(OK, message)
 
 
+def user_env(name: str) -> str:
+    """Value of an environment variable in this process or, on Windows, saved for the user.
+
+    Programs started before a variable was saved (VS Code, for example) do not see it yet,
+    so both places are checked.
+    """
+    value = os.environ.get(name, "")
+    if value or sys.platform != "win32":
+        return value
+    import winreg
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+            saved, _ = winreg.QueryValueEx(key, name)
+    except OSError:
+        return ""
+    return str(saved)
+
+
+def ollama_cloud_disabled() -> bool:
+    """True if Ollama's cloud features are off, in ~/.ollama/server.json or by variable."""
+    try:
+        settings = json.loads(OLLAMA_SERVER_JSON.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        settings = {}
+    if isinstance(settings, dict) and settings.get("disable_ollama_cloud") is True:
+        return True
+    return user_env("OLLAMA_NO_CLOUD") in GO_TRUE
+
+
+def check_ollama_privacy() -> str:
+    """Check the Ollama settings that could send the text away or write it to disk."""
+    if shutil.which("ollama") is None and not OLLAMA_SERVER_JSON.parent.exists():
+        return report(WARN, "Ollama is not installed; the debate between LLMs needs it.")
+    problems = []
+    if not ollama_cloud_disabled():
+        problems.append(f"cloud features are on (set disable_ollama_cloud in {OLLAMA_SERVER_JSON})")
+    for name in OLLAMA_LOGGING_VARIABLES:
+        if user_env(name) not in GO_FALSE:
+            problems.append(f"{name} is set (it writes the analyzed text to logs or files)")
+    host = user_env("OLLAMA_HOST")
+    if host:
+        address = host if "://" in host else f"http://{host}"
+        if address.startswith("http://:"):  # ":11434" means 127.0.0.1:11434 for Ollama
+            address = address.replace("http://:", "http://127.0.0.1:", 1)
+        try:
+            check_host(address)
+        except LocalLLMError:
+            problems.append(f"OLLAMA_HOST={host} makes Ollama reachable from other machines")
+    if problems:
+        return report(FAIL, "Ollama: " + "; ".join(problems) + ".")
+    return report(OK, "Ollama privacy: cloud features off, no text logging, this machine only")
+
+
+def check_ollama_server(llm: object) -> str:
+    """Check that the configured Ollama server runs on this machine and has the models."""
+    if not isinstance(llm, dict) or not llm.get("host"):
+        return report(FAIL, "The configuration has no 'llm' section with a host.")
+    try:
+        check_host(llm["host"])
+    except LocalLLMError as error:
+        return report(FAIL, str(error))
+    try:
+        version = server_version(llm["host"], timeout_s=5)
+        require_models(connect(llm["host"], timeout_s=10), llm.get("models", []))
+    except LocalLLMError as error:
+        return report(WARN, str(error))
+    message = f"Ollama {version} at {llm['host']} with {', '.join(llm.get('models', []))}"
+    expected = str(llm.get("ollama_version", ""))
+    if expected and version != expected:
+        return report(WARN, f"{message}; the project was measured with Ollama {expected}")
+    return report(OK, message)
+
+
 def check_disk() -> str:
     """Check the free disk space on the drive that holds the project."""
     free_gb = shutil.disk_usage(REPO_ROOT).free / 1024**3
@@ -187,10 +270,14 @@ def main() -> int:
     try:
         config = load_config(args.config)
     except ConfigError as error:
+        config = None
         results.append(report(FAIL, str(error)))
-    else:
+    if config is not None:
         results.append(check_data_paths_ignored(config.get("paths")))
-    results += [check_gpu(), check_torch(), check_disk(), check_long_paths()]
+    results += [check_gpu(), check_torch(), check_ollama_privacy()]
+    if config is not None:
+        results.append(check_ollama_server(config.get("llm")))
+    results += [check_disk(), check_long_paths()]
 
     failures, warnings = results.count(FAIL), results.count(WARN)
     print(f"\n{failures} failure(s), {warnings} warning(s).")
